@@ -20,7 +20,7 @@ def get_args():
 
     parser.add_argument('--mirror', action='store_true')
 
-    parser.add_argument("--model_select", type=int, default=0)
+    parser.add_argument("--model_select", type=int, default=3)
     parser.add_argument("--keypoint_score", type=float, default=0.4)
 
     args = parser.parse_args()
@@ -38,13 +38,14 @@ def run_inference(interpreter, input_size, image):
     input_image = tf.cast(input_image, dtype=tf.uint8)  # uint8へキャスト
 
     # 推論
-    input_details = interpreter.get_input_details()
-    interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
-    interpreter.invoke()
+    with tf.device('/cpu:0'):
+        input_details = interpreter.get_input_details()
+        interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
+        interpreter.invoke()
 
-    output_details = interpreter.get_output_details()
-    keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
-    keypoints_with_scores = np.squeeze(keypoints_with_scores)
+        output_details = interpreter.get_output_details()
+        keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+        keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
     # キーポイント、スコア取り出し
     keypoints = []
@@ -75,6 +76,7 @@ def main():
     keypoint_score_th = args.keypoint_score
 
     # カメラ準備 ###############################################################
+    cap_device = '/Users/valuepawn3244/MoveNet-Python-Example/Media/walking-persons.mp4'
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
@@ -96,6 +98,9 @@ def main():
         sys.exit(
             "*** model_select {} is invalid value. Please use 0-3. ***".format(
                 model_select))
+        
+    model_path = 'Models/single_pose.tflite'
+    input_size = 192
 
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
@@ -118,7 +123,8 @@ def main():
             frame,
         )
 
-        elapsed_time = time.time() - start_time
+        elapsed_time = 1000*(time.time() - start_time)
+        elapsed_time = 1000/elapsed_time
 
         # デバッグ描画
         debug_image = draw_debug(
@@ -305,11 +311,11 @@ def draw_debug(
 
     # 処理時間
     cv.putText(debug_image,
-               "Elapsed Time : " + '{:.1f}'.format(elapsed_time * 1000) + "ms",
+               "Elapsed Time : " + '{:.1f}'.format(elapsed_time) + "fps",
                (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 4,
                cv.LINE_AA)
     cv.putText(debug_image,
-               "Elapsed Time : " + '{:.1f}'.format(elapsed_time * 1000) + "ms",
+               "Elapsed Time : " + '{:.1f}'.format(elapsed_time) + "fps",
                (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2,
                cv.LINE_AA)
 

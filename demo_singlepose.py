@@ -21,8 +21,8 @@ def get_args():
 
     parser.add_argument('--mirror', action='store_true')
 
-    parser.add_argument("--model_select", type=int, default=0)
-    parser.add_argument("--keypoint_score", type=float, default=0.4)
+    parser.add_argument("--model_select", type=int, default=1)
+    parser.add_argument("--keypoint_score", type=float, default=0.1)
 
     args = parser.parse_args()
 
@@ -39,7 +39,8 @@ def run_inference(model, input_size, image):
     input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
 
     # 推論
-    outputs = model(input_image)
+    with tf.device('/cpu:0'):
+        outputs = model(input_image)
 
     keypoints_with_scores = outputs['output_0'].numpy()
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
@@ -73,6 +74,7 @@ def main():
     keypoint_score_th = args.keypoint_score
 
     # カメラ準備 ###############################################################
+    cap_device = '/Users/valuepawn3244/MoveNet-Python-Example/Media/walking-persons.mp4'
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)

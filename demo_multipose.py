@@ -21,7 +21,7 @@ def get_args():
 
     parser.add_argument('--mirror', action='store_true')
 
-    parser.add_argument("--keypoint_score", type=float, default=0.4)
+    parser.add_argument("--keypoint_score", type=float, default=0.1)
     parser.add_argument("--bbox_score", type=float, default=0.2)
 
     args = parser.parse_args()
@@ -34,12 +34,13 @@ def run_inference(model, input_size, image):
 
     # 前処理
     input_image = cv.resize(image, dsize=(input_size, input_size))  # リサイズ
-    input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB変換
+    input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB
     input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
     input_image = tf.cast(input_image, dtype=tf.int32)  # int32へキャスト
 
     # 推論
-    outputs = model(input_image)
+    with tf.device('/cpu:0'):
+        outputs = model(input_image)
 
     keypoints_with_scores = outputs['output_0'].numpy()
     keypoints_with_scores = np.squeeze(keypoints_with_scores)
@@ -92,16 +93,21 @@ def main():
     bbox_score_th = args.bbox_score
 
     # カメラ準備 ###############################################################
+    cap_device = '/Users/valuepawn3244/MoveNet-Python-Example/Media/walking-persons.mp4'
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
 
     # モデルロード #############################################################
-    model_url = "https://tfhub.dev/google/movenet/multipose/lightning/1"
-    input_size = 256
+    #model_url = "https://tfhub.dev/google/movenet/multipose/lightning/1"
+    #input_size = 256
+    model_path = 'Models/multipose.tflite'
+    input_size = 192
 
-    module = tfhub.load(model_url)
-    model = module.signatures['serving_default']
+    with tf.device('/cpu:0'):
+        #module = tfhub.load(model_url)
+        module = tf.lite.Interpreter(model_path=model_path)
+        model = module.signatures['serving_default']
 
     while True:
         start_time = time.time()
