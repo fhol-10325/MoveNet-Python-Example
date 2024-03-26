@@ -34,7 +34,7 @@ def run_inference(interpreter, input_size, image):
     input_image = cv.resize(image, dsize=(input_size, input_size))  
     input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB
     input_image = input_image.reshape(-1, input_size, input_size, 3) 
-    input_image = tf.cast(input_image, dtype=tf.uint8)  # uint8
+    input_image = tf.cast(input_image, dtype=tf.float32)  # uint8 / float32
 
     with tf.device('/cpu:0'):
         input_details = interpreter.get_input_details()
@@ -42,10 +42,18 @@ def run_inference(interpreter, input_size, image):
         interpreter.invoke()
 
         output_details = interpreter.get_output_details()
-        keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
-        keypoints_with_scores = np.squeeze(keypoints_with_scores)
+        #keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+        #keypoints_with_scores = np.squeeze(keypoints_with_scores)
+        hand_landmarks = interpreter.get_tensor(output_details[0]['index'])
 
     keypoints = []
+    scores = []
+    for i, landmark in enumerate(hand_landmarks[0]):
+        # Extracting the x, y coordinates
+        x, y = landmark[0], landmark[1]
+        keypoints.append([x, y])
+        
+    '''keypoints = []
     scores = []
     for index in range(17):
         keypoint_x = int(image_width * keypoints_with_scores[index][1])
@@ -54,7 +62,7 @@ def run_inference(interpreter, input_size, image):
 
         keypoints.append([keypoint_x, keypoint_y])
         scores.append(score)
-
+    '''
     return keypoints, scores
 
 
@@ -96,8 +104,8 @@ def main():
             "*** model_select {} is invalid value. Please use 0-3. ***".format(
                 model_select))
         
-    model_path = 'Models/singlepose-thunder-tflite-float16.tflite'
-    input_size = 256#192
+    model_path = 'Models/hand_landmark_full.tflite'
+    input_size = 224#192
 
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
