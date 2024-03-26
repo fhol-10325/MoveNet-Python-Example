@@ -21,7 +21,7 @@ def get_args():
     parser.add_argument('--mirror', action='store_true')
 
     parser.add_argument("--model_select", type=int, default=3)
-    parser.add_argument("--keypoint_score", type=float, default=0.4)
+    parser.add_argument("--keypoint_score", type=float, default=0.25)
 
     args = parser.parse_args()
 
@@ -31,13 +31,11 @@ def get_args():
 def run_inference(interpreter, input_size, image):
     image_width, image_height = image.shape[1], image.shape[0]
 
-    # 前処理
-    input_image = cv.resize(image, dsize=(input_size, input_size))  # リサイズ
-    input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB変換
-    input_image = input_image.reshape(-1, input_size, input_size, 3)  # リシェイプ
-    input_image = tf.cast(input_image, dtype=tf.uint8)  # uint8へキャスト
+    input_image = cv.resize(image, dsize=(input_size, input_size))  
+    input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB
+    input_image = input_image.reshape(-1, input_size, input_size, 3) 
+    input_image = tf.cast(input_image, dtype=tf.uint8)  # uint8
 
-    # 推論
     with tf.device('/cpu:0'):
         input_details = interpreter.get_input_details()
         interpreter.set_tensor(input_details[0]['index'], input_image.numpy())
@@ -47,7 +45,6 @@ def run_inference(interpreter, input_size, image):
         keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
         keypoints_with_scores = np.squeeze(keypoints_with_scores)
 
-    # キーポイント、スコア取り出し
     keypoints = []
     scores = []
     for index in range(17):
@@ -62,7 +59,7 @@ def run_inference(interpreter, input_size, image):
 
 
 def main():
-    # 引数解析 #################################################################
+    ##################################################################
     args = get_args()
     cap_device = args.device
     cap_width = args.width
@@ -76,7 +73,7 @@ def main():
     keypoint_score_th = args.keypoint_score
 
     # カメラ準備 ###############################################################
-    cap_device = '/Users/valuepawn3244/MoveNet-Python-Example/Media/walking-persons.mp4'
+    cap_device = 'Media/yoga-1.mp4'
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
@@ -99,8 +96,8 @@ def main():
             "*** model_select {} is invalid value. Please use 0-3. ***".format(
                 model_select))
         
-    model_path = 'Models/single_pose.tflite'
-    input_size = 192
+    model_path = 'Models/singlepose-thunder-tflite-float16.tflite'
+    input_size = 256#192
 
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
