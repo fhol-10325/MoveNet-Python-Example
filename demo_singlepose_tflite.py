@@ -9,7 +9,6 @@ import cv2 as cv
 import numpy as np
 import tensorflow as tf
 
-
 def get_args():
     parser = argparse.ArgumentParser()
 
@@ -21,7 +20,7 @@ def get_args():
     parser.add_argument('--mirror', action='store_true')
 
     parser.add_argument("--model_select", type=int, default=3)
-    parser.add_argument("--keypoint_score", type=float, default=0.25)
+    parser.add_argument("--keypoint_score", type=float, default=0.1)
 
     args = parser.parse_args()
 
@@ -33,7 +32,7 @@ def run_inference(interpreter, input_size, image):
 
     input_image = cv.resize(image, dsize=(input_size, input_size))  
     input_image = cv.cvtColor(input_image, cv.COLOR_BGR2RGB)  # BGR→RGB
-    input_image = input_image.reshape(-1, input_size, input_size, 3) 
+    input_image = input_image.reshape(-1, input_size, input_size, 3)
     input_image = tf.cast(input_image, dtype=tf.float32)  # uint8 / float32
 
     with tf.device('/cpu:0'):
@@ -42,18 +41,19 @@ def run_inference(interpreter, input_size, image):
         interpreter.invoke()
 
         output_details = interpreter.get_output_details()
-        #keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
-        #keypoints_with_scores = np.squeeze(keypoints_with_scores)
-        hand_landmarks = interpreter.get_tensor(output_details[0]['index'])
-
-    keypoints = []
+        keypoints_with_scores = interpreter.get_tensor(output_details[0]['index'])
+        keypoints_with_scores = np.squeeze(keypoints_with_scores)
+        #hand_landmarks = interpreter.get_tensor(output_details[0]['index'])
+    
+    keypoints = []#np.zeros(17)
     scores = []
-    for i, landmark in enumerate(hand_landmarks[0]):
-        # Extracting the x, y coordinates
-        x, y = landmark[0], landmark[1]
-        keypoints.append([x, y])
+    '''for i in range(17):
+        keypoint_x = int(hand_landmarks[0, i])
+        keypoint_y = int(hand_landmarks[0, i+1])
+        keypoints.append([keypoint_x, keypoint_y])
+        scores.append(1)'''
         
-    '''keypoints = []
+    keypoints = []
     scores = []
     for index in range(17):
         keypoint_x = int(image_width * keypoints_with_scores[index][1])
@@ -62,7 +62,7 @@ def run_inference(interpreter, input_size, image):
 
         keypoints.append([keypoint_x, keypoint_y])
         scores.append(score)
-    '''
+    
     return keypoints, scores
 
 
@@ -81,7 +81,7 @@ def main():
     keypoint_score_th = args.keypoint_score
 
     # カメラ準備 ###############################################################
-    cap_device = 'Media/yoga-1.mp4'
+    cap_device = 0#'Media/IMG_2415.MOV'
     cap = cv.VideoCapture(cap_device)
     cap.set(cv.CAP_PROP_FRAME_WIDTH, cap_width)
     cap.set(cv.CAP_PROP_FRAME_HEIGHT, cap_height)
@@ -104,24 +104,27 @@ def main():
             "*** model_select {} is invalid value. Please use 0-3. ***".format(
                 model_select))
         
-    model_path = 'Models/hand_landmark_full.tflite'
-    input_size = 224#192
+    model_path = 'Models/singlepose-lightning.tflite'
+    input_size = 192
 
     interpreter = tf.lite.Interpreter(model_path=model_path)
     interpreter.allocate_tensors()
 
+    cv.namedWindow('MoveNet(singlepose) Demo')
+
     while True:
         start_time = time.time()
 
-        # カメラキャプチャ #####################################################
         ret, frame = cap.read()
         if not ret:
             break
         if mirror:
-            frame = cv.flip(frame, 1)  # ミラー表示
-        debug_image = copy.deepcopy(frame)
+            frame = cv.flip(frame, 1) 
+        input_image = copy.deepcopy(frame)
+        #frame = cv.resize(frame, dsize=(input_size, input_size))  
 
-        # 検出実施 ##############################################################
+        keypoints = np.zeros(17)
+        scores = np.zeros(17)
         keypoints, scores = run_inference(
             interpreter,
             input_size,
@@ -131,21 +134,18 @@ def main():
         elapsed_time = 1000*(time.time() - start_time)
         elapsed_time = 1000/elapsed_time
 
-        # デバッグ描画
         debug_image = draw_debug(
-            debug_image,
+            input_image,
             elapsed_time,
             keypoint_score_th,
             keypoints,
             scores,
         )
-
-        # キー処理(ESC：終了) ##################################################
+        
         key = cv.waitKey(1)
         if key == 27:  # ESC
             break
 
-        # 画面反映 #############################################################
         cv.imshow('MoveNet(singlepose) Demo', debug_image)
 
     cap.release()
